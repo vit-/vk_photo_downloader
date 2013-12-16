@@ -21,7 +21,9 @@ def request_api(method, params={}):
 def create_parser():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('group', help='Owner name or id')
+    parser.add_argument('owner', help='Owner name or id')
+    parser.add_argument('-u', help='Owner is user', action='store_true',
+                        dest='source_is_user')
     parser.add_argument('-a', '--album', nargs='*', type=int,
                         help='Specify album id to download')
     parser.add_argument('-p', '--path',
@@ -44,19 +46,21 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
+    req_args, req_kwargs = ('groups.getById', ), {'params': {'group_id': args.owner}}
+    if args.source_is_user:
+        req_args, req_kwargs = ('users.get', ), {'params': {'user_ids': args.owner}}
+
     try:
-        group_info = request_api(
-            'groups.getById',
-            params={'group_id': args.group}
-        )[0]
+        owner_info = request_api(*req_args, **req_kwargs)[0]
     except VKException:
-        print('Can\'t find group with name {}'.format(args.group))
+        print('Can\'t find owner with name or id {}'.format(args.owner))
     else:
-        gid = group_info['gid']
-        albums = request_api(
-            'photos.getAlbums',
-            params={'owner_id': '-{}'.format(gid)}
-        )
+        if args.source_is_user:
+            owner_id = owner_info['uid']
+        else:
+            owner_id = '-{}'.format(owner_info['gid'])
+
+        albums = request_api('photos.getAlbums', params={'owner_id': owner_id})
         download_dir = get_download_dir(args.path)
         print('Saving to {}...'.format(download_dir))
 
@@ -65,6 +69,7 @@ if __name__ == '__main__':
             print('-' * 80)
             for album in albums:
                 print(u'{aid}\t{title}'.format(**album))
+            sys.exit(0)
 
         for down_album in args.album:
             valid = False
@@ -81,38 +86,30 @@ if __name__ == '__main__':
                     current_download_dir = download_dir
                 photos = request_api(
                     'photos.get',
-                    params={'owner_id': '-{}'.format(gid),
-                            'album_id': down_album}
+                    params={'owner_id': owner_id, 'album_id': down_album}
                 )
                 photos_count = len(photos)
                 pos_len = len(str(photos_count))
+                photo_suffixes = ['_xxxbig', '_xxbig', '_xbig',
+                                  '_big', '_small', '']
+
                 for pos_raw, photo in enumerate(photos):
                     sys.stdout.write('\rDownloading {} of {}'.format(
                         pos_raw + 1, photos_count))
                     sys.stdout.flush()
-
-                    src_keys = (
-                        'src_xxxbig',
-                        'src_xxbig',
-                        'src_xbig',
-                        'src_big',
-                        'src',
-                        'src_small',
-                    )
-                    photo_url = None
-                    for key in src_keys:
+                    for suffix in photo_suffixes:
+                        key = 'src{}'.format(suffix)
                         if key in photo:
                             photo_url = photo[key]
+                            response = requests.get(photo_url, stream=True)
+                            ext = photo_url.split('.')[-1]
+                            pos = str(pos_raw + 1).rjust(pos_len, '0')
+                            file_name = '{}/{}.{}'.format(download_dir,
+                                                          pos, ext)
+                            with open(file_name, 'wb') as f:
+                                for chunk in response.iter_content(1024):
+                                    f.write(chunk)
                             break
-                    if photo_url is None:
-                        continue
-
-                    response = requests.get(photo_url, stream=True)
-                    ext = photo_url.split('.')[-1]
-                    pos = str(pos_raw + 1).rjust(pos_len, '0')
-                    with open('{}/{}.{}'.format(current_download_dir, pos, ext), 'wb') as f:
-                        for chunk in response.iter_content(1024):
-                            f.write(chunk)
                 print('\n')
             else:
                 print('Wrong album id {}'.format(down_album))
