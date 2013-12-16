@@ -22,7 +22,7 @@ def create_parser():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('group', help='Owner name or id')
-    parser.add_argument('-a', '--album',
+    parser.add_argument('-a', '--album', nargs='*', type=int,
                         help='Specify album id to download')
     parser.add_argument('-p', '--path',
                         help='Specify path to save photos',
@@ -43,7 +43,6 @@ def get_download_dir(dir_path, subdir=None):
 if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
-    albums_to_download = [int(i) for i in args.album.split() if i.isdigit()] if args.album else []
 
     try:
         group_info = request_api(
@@ -61,13 +60,13 @@ if __name__ == '__main__':
         download_dir = get_download_dir(args.path)
         print('Saving to {}...'.format(download_dir))
 
-        if not albums_to_download:
+        if not args.album:
             print('Album list\n\nid\t\ttitle')
             print('-' * 80)
             for album in albums:
                 print(u'{aid}\t{title}'.format(**album))
 
-        for down_album in albums_to_download:
+        for down_album in args.album:
             valid = False
             for album in albums:
                 if down_album == album['aid']:
@@ -75,7 +74,7 @@ if __name__ == '__main__':
                     break
             if valid:
                 print('Downloading {}'.format(down_album))
-                if len(albums_to_download) > 1:
+                if len(args.album) > 1:
                     current_download_dir = get_download_dir(download_dir,
                                                             str(down_album))
                 else:
