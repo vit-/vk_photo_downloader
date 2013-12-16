@@ -72,7 +72,7 @@ if __name__ == '__main__':
             else:
                 print('Wrong album id')
         else:
-            print('Album list (title/id)')
+            print('Album list\n\nid\t\ttitle')
             print('-' * 80)
             for album in albums:
-                print(u'{title} - {aid}'.format(**album))
+                print(u'{aid}\t{title}'.format(**album))
