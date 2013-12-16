@@ -74,22 +74,26 @@ if __name__ == '__main__':
                 )
                 photos_count = len(photos)
                 pos_len = len(str(photos_count))
+                photo_suffixes = ['_xxxbig', '_xxbig', '_xbig',
+                                  '_big', '_small', '']
+
                 for pos_raw, photo in enumerate(photos):
                     sys.stdout.write('\rDownloading {} of {}'.format(
                         pos_raw + 1, photos_count))
                     sys.stdout.flush()
-
-                    try:
-                        photo_url = photo['src_xxbig']
-                    except KeyError:
-                        continue
-                    else:
-                        response = requests.get(photo['src_xxbig'], stream=True)
-                        ext = photo_url.split('.')[-1]
-                        pos = str(pos_raw + 1).rjust(pos_len, '0')
-                        with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
-                            for chunk in response.iter_content(1024):
-                                f.write(chunk)
+                    for suffix in photo_suffixes:
+                        key = 'src{}'.format(suffix)
+                        if key in photo:
+                            photo_url = photo[key]
+                            response = requests.get(photo_url, stream=True)
+                            ext = photo_url.split('.')[-1]
+                            pos = str(pos_raw + 1).rjust(pos_len, '0')
+                            file_name = '{}/{}.{}'.format(download_dir,
+                                                          pos, ext)
+                            with open(file_name, 'wb') as f:
+                                for chunk in response.iter_content(1024):
+                                    f.write(chunk)
+                            break
                 print('\n')
             else:
                 print('Wrong album id')
