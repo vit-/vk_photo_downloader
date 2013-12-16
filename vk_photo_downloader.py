@@ -76,17 +76,28 @@ if __name__ == '__main__':
                         pos_raw + 1, photos_count))
                     sys.stdout.flush()
 
-                    try:
-                        photo_url = photo['src_xxbig']
-                    except KeyError:
+                    src_keys = (
+                        'src_xxxbig',
+                        'src_xxbig',
+                        'src_xbig',
+                        'src_big',
+                        'src',
+                        'src_small',
+                    )
+                    photo_url = None
+                    for key in src_keys:
+                        if key in photo:
+                            photo_url = photo[key]
+                            break
+                    if photo_url is None:
                         continue
-                    else:
-                        response = requests.get(photo['src_xxbig'], stream=True)
-                        ext = photo_url.split('.')[-1]
-                        pos = str(pos_raw + 1).rjust(pos_len, '0')
-                        with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
-                            for chunk in response.iter_content(1024):
-                                f.write(chunk)
+
+                    response = requests.get(photo_url, stream=True)
+                    ext = photo_url.split('.')[-1]
+                    pos = str(pos_raw + 1).rjust(pos_len, '0')
+                    with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
+                        for chunk in response.iter_content(1024):
+                            f.write(chunk)
                 print('\n')
             else:
                 print('Wrong album id')
