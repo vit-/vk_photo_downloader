@@ -1,8 +1,7 @@
 import requests
-from os import path
+from os import path, makedirs
 
 API_URL = 'https://api.vk.com/method'
-PATH = path.dirname(path.abspath(__file__))
 
 
 class VKException(Exception):
@@ -24,7 +23,18 @@ def create_parser():
     parser.add_argument('group', help='Owner name or id')
     parser.add_argument('-a', '--album', type=int,
                         help='Specify album id to download')
+    parser.add_argument('-p', '--path',
+                        help='Specify path to save photos',
+                        default=path.join(path.dirname(path.abspath(__file__)),
+                                          'download/'))
     return parser
+
+
+def get_download_dir(dir_path):
+    abs_path = path.abspath(dir_path)
+    if not path.exists(abs_path):
+        makedirs(abs_path)
+    return abs_path
 
 
 if __name__ == '__main__':
@@ -44,6 +54,8 @@ if __name__ == '__main__':
             'photos.getAlbums',
             params={'owner_id': '-{}'.format(gid)}
         )
+        download_dir = get_download_dir(args.path)
+        print('Saving to {}...'.format(download_dir))
         if args.album:
             valid = False
             for album in albums:
@@ -66,7 +78,7 @@ if __name__ == '__main__':
                         response = requests.get(photo['src_xxbig'], stream=True)
                         ext = photo_url.split('.')[-1]
                         pos = str(pos_raw + 1).rjust(pos_len, '0')
-                        with open('{}/{}.{}'.format(PATH, pos, ext), 'wb') as f:
+                        with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
                             for chunk in response.iter_content(1024):
                                 f.write(chunk)
             else:
