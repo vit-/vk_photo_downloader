@@ -24,7 +24,7 @@ def create_parser():
     parser.add_argument('owner', help='Owner name or id')
     parser.add_argument('-u', help='Owner is user', action='store_true',
                         dest='source_is_user')
-    parser.add_argument('-a', '--album', type=int,
+    parser.add_argument('-a', '--album', nargs='*', type=int,
                         help='Specify album id to download')
     parser.add_argument('-p', '--path',
                         help='Specify path to save photos',
@@ -33,8 +33,10 @@ def create_parser():
     return parser
 
 
-def get_download_dir(dir_path):
+def get_download_dir(dir_path, subdir=None):
     abs_path = path.abspath(dir_path)
+    if not subdir is None:
+        abs_path = path.join(abs_path, subdir)
     if not path.exists(abs_path):
         makedirs(abs_path)
     return abs_path
@@ -61,16 +63,30 @@ if __name__ == '__main__':
         albums = request_api('photos.getAlbums', params={'owner_id': owner_id})
         download_dir = get_download_dir(args.path)
         print('Saving to {}...'.format(download_dir))
-        if args.album:
+
+        if not args.album:
+            print('Album list\n\nid\t\ttitle')
+            print('-' * 80)
+            for album in albums:
+                print(u'{aid}\t{title}'.format(**album))
+            sys.exit(0)
+
+        for down_album in args.album:
             valid = False
             for album in albums:
-                if args.album == album['aid']:
+                if down_album == album['aid']:
                     valid = True
                     break
             if valid:
+                print('Downloading {}'.format(down_album))
+                if len(args.album) > 1:
+                    current_download_dir = get_download_dir(download_dir,
+                                                            str(down_album))
+                else:
+                    current_download_dir = download_dir
                 photos = request_api(
                     'photos.get',
-                    params={'owner_id': owner_id, 'album_id': args.album}
+                    params={'owner_id': owner_id, 'album_id': down_album}
                 )
                 photos_count = len(photos)
                 pos_len = len(str(photos_count))
@@ -96,9 +112,4 @@ if __name__ == '__main__':
                             break
                 print('\n')
             else:
-                print('Wrong album id')
-        else:
-            print('Album list\n\nid\t\ttitle')
-            print('-' * 80)
-            for album in albums:
-                print(u'{aid}\t{title}'.format(**album))
+                print('Wrong album id {}'.format(down_album))
