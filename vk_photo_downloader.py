@@ -21,7 +21,9 @@ def request_api(method, params={}):
 def create_parser():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('group', help='Owner name or id')
+    parser.add_argument('owner', help='Owner name or id')
+    parser.add_argument('-u', help='Owner is user', action='store_true',
+                        dest='source_is_user')
     parser.add_argument('-a', '--album', type=int,
                         help='Specify album id to download')
     parser.add_argument('-p', '--path',
@@ -42,19 +44,21 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
+    req_args, req_kwargs = ('groups.getById', ), {'params': {'group_id': args.owner}}
+    if args.source_is_user:
+        req_args, req_kwargs = ('users.get', ), {'params': {'user_ids': args.owner}}
+
     try:
-        group_info = request_api(
-            'groups.getById',
-            params={'group_id': args.group}
-        )[0]
+        owner_info = request_api(*req_args, **req_kwargs)[0]
     except VKException:
-        print('Can\'t find group with name {}'.format(args.group))
+        print('Can\'t find owner with name or id {}'.format(args.owner))
     else:
-        gid = group_info['gid']
-        albums = request_api(
-            'photos.getAlbums',
-            params={'owner_id': '-{}'.format(gid)}
-        )
+        if args.source_is_user:
+            owner_id = owner_info['uid']
+        else:
+            owner_id = '-{}'.format(owner_info['gid'])
+
+        albums = request_api('photos.getAlbums', params={'owner_id': owner_id})
         download_dir = get_download_dir(args.path)
         print('Saving to {}...'.format(download_dir))
         if args.album:
@@ -66,8 +70,7 @@ if __name__ == '__main__':
             if valid:
                 photos = request_api(
                     'photos.get',
-                    params={'owner_id': '-{}'.format(gid),
-                            'album_id': args.album}
+                    params={'owner_id': owner_id, 'album_id': args.album}
                 )
                 photos_count = len(photos)
                 pos_len = len(str(photos_count))
