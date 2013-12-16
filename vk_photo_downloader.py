@@ -22,7 +22,7 @@ def create_parser():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('group', help='Owner name or id')
-    parser.add_argument('-a', '--album', type=int,
+    parser.add_argument('-a', '--album',
                         help='Specify album id to download')
     parser.add_argument('-p', '--path',
                         help='Specify path to save photos',
@@ -31,8 +31,10 @@ def create_parser():
     return parser
 
 
-def get_download_dir(dir_path):
+def get_download_dir(dir_path, subdir=None):
     abs_path = path.abspath(dir_path)
+    if not subdir is None:
+        abs_path = path.join(abs_path, subdir)
     if not path.exists(abs_path):
         makedirs(abs_path)
     return abs_path
@@ -41,6 +43,7 @@ def get_download_dir(dir_path):
 if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
+    albums_to_download = [int(i) for i in args.album.split() if i.isdigit()] if args.album else []
 
     try:
         group_info = request_api(
@@ -57,17 +60,30 @@ if __name__ == '__main__':
         )
         download_dir = get_download_dir(args.path)
         print('Saving to {}...'.format(download_dir))
-        if args.album:
+
+        if not albums_to_download:
+            print('Album list\n\nid\t\ttitle')
+            print('-' * 80)
+            for album in albums:
+                print(u'{aid}\t{title}'.format(**album))
+
+        for down_album in albums_to_download:
             valid = False
             for album in albums:
-                if args.album == album['aid']:
+                if down_album == album['aid']:
                     valid = True
                     break
             if valid:
+                print('Downloading {}'.format(down_album))
+                if len(albums_to_download) > 1:
+                    current_download_dir = get_download_dir(download_dir,
+                                                            str(down_album))
+                else:
+                    current_download_dir = download_dir
                 photos = request_api(
                     'photos.get',
                     params={'owner_id': '-{}'.format(gid),
-                            'album_id': args.album}
+                            'album_id': down_album}
                 )
                 photos_count = len(photos)
                 pos_len = len(str(photos_count))
@@ -95,14 +111,9 @@ if __name__ == '__main__':
                     response = requests.get(photo_url, stream=True)
                     ext = photo_url.split('.')[-1]
                     pos = str(pos_raw + 1).rjust(pos_len, '0')
-                    with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
+                    with open('{}/{}.{}'.format(current_download_dir, pos, ext), 'wb') as f:
                         for chunk in response.iter_content(1024):
                             f.write(chunk)
                 print('\n')
             else:
-                print('Wrong album id')
-        else:
-            print('Album list\n\nid\t\ttitle')
-            print('-' * 80)
-            for album in albums:
-                print(u'{aid}\t{title}'.format(**album))
+                print('Wrong album id {}'.format(down_album))
