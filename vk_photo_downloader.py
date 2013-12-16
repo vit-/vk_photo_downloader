@@ -1,4 +1,5 @@
 import requests
+import sys
 from os import path, makedirs
 
 API_URL = 'https://api.vk.com/method'
@@ -68,8 +69,13 @@ if __name__ == '__main__':
                     params={'owner_id': '-{}'.format(gid),
                             'album_id': args.album}
                 )
-                pos_len = len(str(len(photos)))
+                photos_count = len(photos)
+                pos_len = len(str(photos_count))
                 for pos_raw, photo in enumerate(photos):
+                    sys.stdout.write('\rDownloading {} of {}'.format(
+                        pos_raw + 1, photos_count))
+                    sys.stdout.flush()
+
                     try:
                         photo_url = photo['src_xxbig']
                     except KeyError:
@@ -81,6 +87,7 @@ if __name__ == '__main__':
                         with open('{}/{}.{}'.format(download_dir, pos, ext), 'wb') as f:
                             for chunk in response.iter_content(1024):
                                 f.write(chunk)
+                print('\n')
             else:
                 print('Wrong album id')
         else:
